@@ -15,16 +15,38 @@
 #
 LOCAL_PATH := $(call my-dir)
 
-bouncycastle_src_files := $(call all-java-files-under,src/main/java)
+all_bcprov_src_files := $(call all-java-files-under,bcprov/src/main/java)
+
+android_bcprov_src_files := $(filter-out \
+ bcprov/src/main/java/org/bouncycastle/crypto/digests/AndroidDigestFactoryBouncyCastle.java, \
+ $(all_bcprov_src_files))
+
+ri_bcprov_src_files := $(filter-out \
+ bcprov/src/main/java/org/bouncycastle/crypto/digests/AndroidDigestFactoryOpenSSL.java \
+ bcprov/src/main/java/org/bouncycastle/crypto/digests/OpenSSLDigest.java, \
+ $(all_bcprov_src_files))
 
 include $(CLEAR_VARS)
 LOCAL_MODULE := bouncycastle
 LOCAL_MODULE_TAGS := optional
-LOCAL_SRC_FILES := $(bouncycastle_src_files)
+LOCAL_SRC_FILES := $(android_bcprov_src_files)
 LOCAL_JAVACFLAGS := -encoding UTF-8
-LOCAL_JAVA_LIBRARIES := core
+LOCAL_JAVA_LIBRARIES := conscrypt core
 LOCAL_NO_STANDARD_LIBRARIES := true
+LOCAL_JARJAR_RULES := $(LOCAL_PATH)/jarjar-rules.txt
+LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 include $(BUILD_JAVA_LIBRARY)
+
+# non-jarjar version to build okhttp-tests
+include $(CLEAR_VARS)
+LOCAL_MODULE := bouncycastle-nojarjar
+LOCAL_MODULE_TAGS := optional
+LOCAL_SRC_FILES := $(android_bcprov_src_files)
+LOCAL_JAVACFLAGS := -encoding UTF-8
+LOCAL_JAVA_LIBRARIES := conscrypt core
+LOCAL_NO_STANDARD_LIBRARIES := true
+LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+include $(BUILD_STATIC_JAVA_LIBRARY)
 
 # This is used to generate a list of what is unused so it can be removed when bouncycastle is updated.
 # Based on "Finding dead code" example in ProGuard manual at http://proguard.sourceforge.net/
@@ -32,7 +54,7 @@ include $(BUILD_JAVA_LIBRARY)
 bouncycastle-proguard-deadcode: $(full_classes_compiled_jar) $(full_java_libs)
 	$(PROGUARD) \
 		-injars $(full_classes_compiled_jar) \
-		-libraryjars "$(call normalize-path-list,$(addsuffix (!org/bouncycastle/**.class,!org/apache/harmony/xnet/provider/jsse/OpenSSLMessageDigest.class),$(full_java_libs)))" \
+		-libraryjars "$(call normalize-path-list,$(addsuffix (!org/bouncycastle/**.class,!com/android/org/conscrypt/OpenSSLMessageDigest.class),$(full_java_libs)))" \
 		-dontoptimize \
 		-dontobfuscate \
 		-dontpreverify \
@@ -70,11 +92,31 @@ ifeq ($(WITH_HOST_DALVIK),true)
     include $(CLEAR_VARS)
     LOCAL_MODULE := bouncycastle-hostdex
     LOCAL_MODULE_TAGS := optional
-    LOCAL_SRC_FILES := $(bouncycastle_src_files)
+    LOCAL_SRC_FILES := $(android_bcprov_src_files)
     LOCAL_JAVACFLAGS := -encoding UTF-8
-    LOCAL_JAVA_LIBRARIES := core-hostdex
-    LOCAL_NO_STANDARD_LIBRARIES := true
     LOCAL_BUILD_HOST_DEX := true
     LOCAL_MODULE_TAGS := optional
+    LOCAL_JAVA_LIBRARIES := conscrypt-hostdex
+    LOCAL_JARJAR_RULES := $(LOCAL_PATH)/jarjar-rules.txt
+    LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
     include $(BUILD_HOST_JAVA_LIBRARY)
 endif
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := bouncycastle-host
+LOCAL_MODULE_TAGS := optional
+LOCAL_SRC_FILES := $(ri_bcprov_src_files)
+LOCAL_JAVACFLAGS := -encoding UTF-8
+LOCAL_MODULE_TAGS := optional
+LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+include $(BUILD_HOST_JAVA_LIBRARY)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := bouncycastle-bcpkix-host
+LOCAL_MODULE_TAGS := optional
+LOCAL_SRC_FILES := $(call all-java-files-under,bcpkix/src/main/java)
+LOCAL_JAVACFLAGS := -encoding UTF-8
+LOCAL_MODULE_TAGS := optional
+LOCAL_JAVA_LIBRARIES := bouncycastle-host
+LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+include $(BUILD_HOST_JAVA_LIBRARY)
